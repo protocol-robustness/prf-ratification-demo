@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import fixture from '../examples/ratified-with-dissent.json'
+import { diagnosticStorageKey, readDiagnosticEvents, recordDiagnosticEvent, type BrowserDiagnosticEvent } from './forensics'
 import styles from './page.module.css'
 
 type ContributionKind = 'approve' | 'dissent' | 'challenge'
@@ -11,8 +12,66 @@ const names: Record<string, string> = { alex: 'Alex Morgan', blair: 'Blair Chen'
 
 export default function Home() {
   const [preview, setPreview] = useState<ContributionKind | null>(null)
+  const [diagnosticEvents, setDiagnosticEvents] = useState<BrowserDiagnosticEvent[]>([])
+  const interactionId = useRef<string | null>(null)
+  const pageViewRecorded = useRef(false)
   const approvals = fixture.contributions.filter((c) => c.kind === 'approve').length
   const dissent = fixture.contributions.filter((c) => c.kind === 'dissent')
+
+  useEffect(() => {
+    if (pageViewRecorded.current) return
+    pageViewRecorded.current = true
+    interactionId.current = crypto.randomUUID()
+    setDiagnosticEvents(readDiagnosticEvents())
+    setDiagnosticEvents(recordDiagnosticEvent({
+      event_type: 'page_viewed',
+      interaction_id: interactionId.current,
+      outcome: 'observed',
+    }))
+  }, [])
+
+  function selectResponse(kind: ContributionKind) {
+    const id = interactionId.current ?? crypto.randomUUID()
+    interactionId.current = id
+    recordDiagnosticEvent({ event_type: 'response_selected', interaction_id: id, outcome: 'observed', event_detail: kind })
+    setDiagnosticEvents(recordDiagnosticEvent({ event_type: 'preview_opened', interaction_id: id, outcome: 'observed', event_detail: kind }))
+    setPreview(kind)
+  }
+
+  function cancelPreview() {
+    if (interactionId.current) {
+      setDiagnosticEvents(recordDiagnosticEvent({
+        event_type: 'preview_cancelled',
+        interaction_id: interactionId.current,
+        outcome: 'cancelled',
+        reason_code: 'visitor-dismissed-preview',
+      }))
+    }
+    setPreview(null)
+  }
+
+  function exportDiagnostics() {
+    const id = interactionId.current ?? crypto.randomUUID()
+    interactionId.current = id
+    const events = recordDiagnosticEvent({ event_type: 'diagnostics_exported', interaction_id: id, outcome: 'observed' })
+    setDiagnosticEvents(events)
+    const blob = new Blob([JSON.stringify({ schema_version: 'prf-browser-diagnostic-export.v1', trust_level: 'browser-reported-untrusted', events }, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `prf-browser-diagnostics-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function clearDiagnostics() {
+    try {
+      localStorage.removeItem(diagnosticStorageKey)
+    } catch {
+      // The page remains usable when browser storage is unavailable.
+    }
+    setDiagnosticEvents([])
+  }
 
   return (
     <main className={styles.page}>
@@ -123,11 +182,11 @@ export default function Home() {
       </div>
 
       <section className={styles.actions} aria-labelledby="action-title">
-        <div><div className={styles.kicker}>03 / YOUR RESPONSE</div><h2 id="action-title">Explore a researcher response</h2><p>Preview an intent against this exact basis. The demo does not collect keys or record your choice.</p></div>
+        <div><div className={styles.kicker}>03 / YOUR RESPONSE</div><h2 id="action-title">Explore a researcher response</h2><p>Preview an intent against this exact basis. No keys are collected and nothing is submitted.</p></div>
         <div className={styles.buttons}>
-          <button onClick={() => setPreview('approve')}>Agree</button>
-          <button className={styles.outline} onClick={() => setPreview('dissent')}>Dissent</button>
-          <button className={styles.outline} onClick={() => setPreview('challenge')}>Challenge</button>
+          <button onClick={() => selectResponse('approve')}>Agree</button>
+          <button className={styles.outline} onClick={() => selectResponse('dissent')}>Dissent</button>
+          <button className={styles.outline} onClick={() => selectResponse('challenge')}>Challenge</button>
         </div>
       </section>
 
@@ -135,8 +194,25 @@ export default function Home() {
         <div><div className={styles.kicker}>LOCAL PREVIEW · NOT SUBMITTED</div><h2>{preview === 'approve' ? 'Agreement intent' : preview === 'dissent' ? 'Dissent intent' : 'Challenge intent'}</h2>
           <p>This response would be bound to the basis below. A real client would request a server-prepared intent, show the exact signed fields, then use a user-controlled signer.</p>
           <code className={styles.previewRoot}>{fixture.target.root}</code>
-        </div><button className={styles.close} onClick={() => setPreview(null)} aria-label="Close preview">×</button>
+        </div><button className={styles.close} onClick={cancelPreview} aria-label="Close preview">×</button>
       </section>}
+
+      <section className={styles.diagnostics} aria-labelledby="diagnostics-title">
+        <div className={styles.diagnosticsHead}>
+          <div><div className={styles.kicker}>LOCAL ONLY · BROWSER REPORTED</div><h2 id="diagnostics-title">Diagnostic activity</h2></div>
+          <div className={styles.diagnosticButtons}>
+            <button onClick={exportDiagnostics} disabled={diagnosticEvents.length === 0}>Export JSON</button>
+            <button className={styles.outline} onClick={clearDiagnostics} disabled={diagnosticEvents.length === 0}>Clear local history</button>
+          </div>
+        </div>
+        <p>Page views and response previews are stored in this browser only. They are not uploaded and do not prove who acted. The event time comes from the unverified browser clock; server observation time is unavailable. Clear them at any time; export creates a local JSON file.</p>
+        <div className={styles.diagnosticMeta}><span>{diagnosticEvents.length} events saved in this browser</span><span>Trust: browser-reported, untrusted</span><span>Storage: localStorage · max 250 events</span></div>
+        {diagnosticEvents.length > 0 && <details className={styles.forensic}><summary>Inspect recent diagnostic events</summary>
+          {[...diagnosticEvents].reverse().slice(0, 8).map((event) => <div className={styles.diagnosticEvent} key={event.event_id}>
+            <code>{event.occurred_at}</code><strong>{event.event_type.replaceAll('_', ' ')}</strong><span>{event.reason_code ?? event.event_detail ?? event.outcome}</span>
+          </div>)}
+        </details>}
+      </section>
 
       <details className={styles.artifact}><summary>Inspect example artifact</summary><pre>{JSON.stringify(fixture, null, 2)}</pre></details>
 

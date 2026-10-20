@@ -33,6 +33,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
       - name: Build static export
+        env:
+          NEXT_PUBLIC_SOURCE_REVISION: ${{ github.sha }}
         run: pnpm build
       - name: Check deploy configuration
         shell: bash

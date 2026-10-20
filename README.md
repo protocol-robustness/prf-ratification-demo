@@ -45,6 +45,10 @@ The sentence describing the analytical claim is illustrative display copy; the f
 
 Expandable forensic panels expose target, policy, contribution, decision, signature, and ratification fields. Root values and signature bytes are copyable. Any `verified`/`verification` text is reported by the fixture; the frontend does not independently verify signatures or recompute canonical roots.
 
+The browser also keeps a small, local-only diagnostic history of page views, response selections, previews, cancellations, and exports. Visitors can export it as JSON or clear it. It stays in browser `localStorage`, is capped at 250 events, and is never uploaded by this app. Events are explicitly marked `browser-reported-untrusted`; the event time comes from the unverified browser clock, and server observation time is unavailable. Interaction IDs are diagnostic only and cannot identify a person, authorize an action, or prove that an action occurred. Storage may be unavailable, in which case the demo continues without retaining events. No keys, signature payloads, page contents, or request bodies are recorded. There is no signing action in this demonstration, so signing cancellation is not an event it can record.
+
+The static site has no runtime application server or PRF API. CloudFront access logs are configured separately as infrastructure-observed, best-effort request evidence. Account-level CloudTrail management events are enabled for infrastructure changes. Neither source proves a PRF policy evaluation or operation; a future PRF service must emit its own server-observed records and authoritative operation evidence.
+
 Copied artifact SHA-256 digests:
 
 ```text
