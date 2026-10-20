@@ -205,8 +205,8 @@ export default function Home() {
             <button className={styles.outline} onClick={clearDiagnostics} disabled={diagnosticEvents.length === 0}>Clear local history</button>
           </div>
         </div>
-        <p>Page views and response previews are stored in this browser only. They are not uploaded and do not prove who acted. The event time comes from the unverified browser clock; server observation time is unavailable. Clear them at any time; export creates a local JSON file.</p>
-        <div className={styles.diagnosticMeta}><span>{diagnosticEvents.length} events saved in this browser</span><span>Trust: browser-reported, untrusted</span><span>Storage: localStorage · max 250 events</span></div>
+        <p>Page views and response previews are kept only in this browser when local storage is available. They are not uploaded and do not prove who acted. The event time comes from the unverified browser clock; server observation time is unavailable. Clear them at any time; export creates a local JSON file.</p>
+        <div className={styles.diagnosticMeta}><span>{diagnosticEvents.length} events in this page session</span><span>Trust: browser-reported, untrusted</span><span>Persistence: localStorage when available · max 250 events</span></div>
         {diagnosticEvents.length > 0 && <details className={styles.forensic}><summary>Inspect recent diagnostic events</summary>
           {[...diagnosticEvents].reverse().slice(0, 8).map((event) => <div className={styles.diagnosticEvent} key={event.event_id}>
             <code>{event.occurred_at}</code><strong>{event.event_type.replaceAll('_', ' ')}</strong><span>{event.reason_code ?? event.event_detail ?? event.outcome}</span>
