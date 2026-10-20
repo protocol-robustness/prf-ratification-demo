@@ -84,7 +84,7 @@ export default function Home() {
 
       <section className={styles.notice} aria-label="Demonstration notice">
         <span className={styles.noticeIcon}>i</span>
-        <p><strong>DEMONSTRATION ONLY</strong><br />This page displays a committed example with test identities and test-only signatures. Your interaction is not signed or submitted, and grants no operational authorization.</p>
+        <p><strong>DEMONSTRATION ONLY</strong><br />This page displays a committed example with test identities and test-only signatures. Local page and response diagnostics stay in this browser. Hosting access logs record request IP, path, method, status, and browser user-agent in restricted AWS storage for up to 90 days; delivery is best-effort. Nothing is signed or submitted, and no operational authorization is granted.</p>
       </section>
 
       <header className={styles.hero}>
